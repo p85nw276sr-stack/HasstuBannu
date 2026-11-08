@@ -1,0 +1,48 @@
+name: Build Tendies Studio IPA
+
+on:
+  workflow_dispatch: # Позволяет запускать сборку кнопкой с телефона
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install Cordova
+        run: npm install -g cordova
+
+      - name: Create Project
+        run: |
+          cordova create tendiesapp com.tendies.studio "TendiesStudio"
+          rm -rf tendiesapp/www/*
+          cp index.html tendiesapp/www/
+
+      - name: Add iOS Platform
+        run: |
+          cd tendiesapp
+          cordova platform add ios
+
+      - name: Build IPA (Unsigned)
+        run: |
+          cd tendiesapp
+          cordova build ios --release -- --codeSignIdentity="Unsigned" --developmentTeam="" --codeSigningAllowed=No
+
+      - name: Package into IPA
+        run: |
+          mkdir -p Payload
+          cp -r tendiesapp/platforms/ios/build/device/*.app Payload/
+          zip -r tendies_studio.ipa Payload
+
+      - name: Upload Finished IPA
+        uses: actions/artifacts@v4
+        with:
+          name: Tendies-Studio-IPA
+          path: tendies_studio.ipa
