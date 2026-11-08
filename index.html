@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Tendies Studio</title>
+<style>
+:root{--bg:#0d0d14;--p:#171723;--b:#2a2a3d;--t:#eeeef6;--m:#8a8aa5;--a:#8b5cf6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--t);font:14px/1.4 system-ui,-apple-system,sans-serif;display:grid;grid-template-columns:260px 1fr 280px;grid-template-rows:auto 1fr;height:100vh;overflow:hidden;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+header{grid-column:1/4;display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--b);flex-wrap:wrap}
+header b{font-size:16px;letter-spacing:.02em}
+aside{background:var(--p);overflow:auto;padding:14px}
+h3{margin:0 0 8px;font-size:12px;font-weight:600;color:var(--m)}
+button,select,input{font:inherit;color:var(--t)}
+button{background:var(--b);border:0;border-radius:10px;padding:8px 12px;cursor:pointer}
+button:hover{background:#3a3a55}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--a);outline-offset:1px}
+.pri{background:linear-gradient(135deg,#8b5cf6,#ec4899);font-weight:600}
+.pri:hover{filter:brightness(1.12);background:linear-gradient(135deg,#8b5cf6,#ec4899)}
+input[type=text],select{background:var(--bg);border:1px solid var(--b);border-radius:8px;padding:7px;width:100%}
+input[type=color]{width:48%;height:34px;border:0;background:none;padding:0}
+input[type=range]{width:100%;accent-color:var(--a)}
+label{display:block;margin:10px 0;font-size:12px;color:var(--m)}
+label>*{margin-top:4px;display:block}
+#cat{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.card{display:flex;flex-direction:column;align-items:center;gap:10px;padding:14px 6px;font-size:12px;overflow:hidden}
+.dot{width:18px;height:18px;border-radius:5px;background:var(--a)}
+main{display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 40%,#1f1f33,#0d0d14);overflow:hidden}
+#wrap{position:relative;border-radius:40px;outline:6px solid #000;overflow:hidden;box-shadow:0 24px 70px #000a}
+#ph{position:absolute;left:0;top:0;width:390px;height:844px;transform-origin:0 0;overflow:hidden}
+.ly{position:absolute;touch-action:none;cursor:grab}
+.ly.sel{outline:1px dashed #fffa;outline-offset:4px}
+.in{width:100%;height:100%}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.chip{padding:5px 10px}.chip.on{background:var(--a)}
+.mu{color:var(--m);margin:0 0 10px}
+#msg{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#000c;padding:10px 16px;border-radius:12px;opacity:0;transition:opacity .25s;pointer-events:none}
+@media(max-width:900px){
+body{display:flex;flex-direction:column;height:auto;overflow:auto}
+header{order:-2}main{order:-1;height:78vh;flex:none}aside{flex:none}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body>
+<header>
+<b>🍗 Tendies Studio</b>
+<input id="nm" type="text" value="Моя тема" style="max-width:170px" aria-label="Название темы">
+<span style="flex:1"></span>
+<button id="rnd">🎲 Случайная</button><button id="sv">💾 Проект</button><button id="op">📂 Открыть</button>
+<button class="pri" id="ex">⬇ Экспорт .tendies</button>
+<input id="fi" type="file" accept=".json" hidden>
+</header>
+<aside>
+<h3>ИИ-генератор тем</h3>
+<input id="ai" type="text" placeholder="Например: неоновый космос">
+<button class="pri" id="go" style="width:100%;margin:8px 0 18px">Создать тему</button>
+<h3>Каталог анимаций — нажмите, чтобы добавить</h3>
+<div id="cat"></div>
+<h3 style="margin-top:18px">Фон</h3>
+<input id="b0" type="color" aria-label="Цвет фона 1"> <input id="b1" type="color" aria-label="Цвет фона 2">
+</aside>
+<main><div id="wrap"><div id="ph"></div></div></main>
+<aside>
+<h3>Слои</h3><div id="ll" class="chips"></div>
+<h3>Свойства слоя</h3><div id="pp"></div>
+</aside>
+<div id="msg"></div>
+<script>
+const $=s=>document.querySelector(s),rnd=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.random()*a.length|0],esc=s=>String(s).replace(/[<>&"]/g,c=>'&#'+c.charCodeAt(0)+';');
+// Каталог анимаций: k = keyPath CoreAnimation, a/b = значения от/до
+const A={
+spin:{n:'Вращение',k:'transform.rotation.z',a:0,b:6.2832,f:v=>`rotate(${v}rad)`,alt:0},
+pulse:{n:'Пульс',k:'transform.scale',a:1,b:1.5,f:v=>`scale(${v})`,alt:1},
+float:{n:'Парение',k:'transform.translation.y',a:0,b:-40,f:v=>`translateY(${v}px)`,alt:1},
+sway:{n:'Качание',k:'transform.translation.x',a:-30,b:30,f:v=>`translateX(${v}px)`,alt:1},
+blink:{n:'Мерцание',k:'opacity',a:1,b:.15,o:1,alt:1},
+tilt:{n:'Маятник',k:'transform.rotation.z',a:-.4,b:.4,f:v=>`rotate(${v}rad)`,alt:1},
+fall:{n:'Падение',k:'transform.translation.y',a:-300,b:500,f:v=>`translateY(${v}px)`,alt:0},
+flip:{n:'Переворот',k:'transform.scale.x',a:1,b:-1,f:v=>`scaleX(${v})`,alt:1}
+};
+const fr=(m,v)=>m.o?{opacity:v}:{transform:m.f(v)};
+const run=(el,m,d)=>m&&el.animate([fr(m,m.a),fr(m,m.b)],{duration:d*1000,iterations:Infinity,direction:m.alt?'alternate':'normal',easing:m.alt?'ease-in-out':'linear'});
+// ИИ: офлайн-генератор по ключевым словам
+const P=[
+[/космос|звезд|галакт|space/i,'Космос',['#05010f','#2b1a6b'],['#ffffff','#a78bfa','#60a5fa'],['⭐','🪐','🌙']],
+[/закат|рассвет|sunset/i,'Закат',['#2d1b4e','#ff7a45'],['#ffd166','#ff5e78','#ffb347'],['☀️','🌅','☁️']],
+[/океан|мор[еяю]|вод|ocean/i,'Океан',['#021b3a','#0aa5c9'],['#7dd3fc','#22d3ee','#e0f2fe'],['🐠','🌊','🫧']],
+[/неон|кибер|neon/i,'Неон',['#0a0014','#12003d'],['#ff00e5','#00f0ff','#b6ff00'],['⚡','💜','✨']],
+[/сакур|весн|цвет|sakura/i,'Сакура',['#ffe3ee','#ffa6c9'],['#ff7eb6','#ffffff','#ffc2dd'],['🌸','🌷','🦋']],
+[/лес|природ|forest/i,'Лес',['#06210f','#2f7d3a'],['#86efac','#facc15','#bef264'],['🍃','🌲','🦋']],
+[/огон|огн|лав|fire/i,'Огонь',['#1a0500','#d92d00'],['#ffb703','#fb5607','#ff006e'],['🔥','✨','🌋']]
+];
+let S={bg:['#0a0014','#12003d'],L:[],sel:null},N=0;
+function ai(q){
+const p=P.find(x=>x[0].test(q))||pick(P);
+S.bg=[...p[2]];S.sel=null;$('#nm').value=(q.trim()||p[1]).slice(0,30);
+const ks=Object.keys(A);
+S.L=Array.from({length:9},(_,i)=>({id:++N,t:i%3?'emoji':'circle',txt:pick(p[4]),c:pick(p[3]),s:Math.round(rnd(30,110)),x:Math.round(rnd(6,94)),y:Math.round(rnd(6,94)),an:pick(ks),d:+rnd(2,7).toFixed(1)}));
+all();toast('Тема «'+$('#nm').value+'» создана');
+}
+function shape(l){
+if(l.t=='emoji')return`font-size:${l.s*.8}px;display:flex;align-items:center;justify-content:center;line-height:1`;
+return`background:${l.c};border-radius:${l.t=='circle'?'50%':'20%'};box-shadow:0 0 ${l.s/2}px ${l.c}`;
+}
+function draw(){
+const p=$('#ph');p.style.background=`linear-gradient(160deg,${S.bg[0]},${S.bg[1]})`;p.innerHTML='';
+S.L.forEach(l=>{
+const o=document.createElement('div');o.className='ly'+(l===S.sel?' sel':'');
+o.style.cssText=`left:${l.x/100*390-l.s/2}px;top:${l.y/100*844-l.s/2}px;width:${l.s}px;height:${l.s}px`;
+const i=document.createElement('div');i.className='in';i.style.cssText=shape(l);if(l.t=='emoji')i.textContent=l.txt;
+if(!matchMedia('(prefers-reduced-motion:reduce)').matches)run(i,A[l.an],l.d);
+o.append(i);o.onpointerdown=e=>drag(e,l);p.append(o);
+});
+}
+function drag(e,l){
+e.preventDefault();if(S.sel!==l){S.sel=l;lists();panel()}
+const r=$('#ph').getBoundingClientRect();
+const mv=ev=>{l.x=Math.round(Math.max(0,Math.min(100,(ev.clientX-r.left)/r.width*100)));l.y=Math.round(Math.max(0,Math.min(100,(ev.clientY-r.top)/r.height*100)));
+['x','y'].forEach(k=>{const n=$('[data-k='+k+']');if(n)n.value=l[k]});draw()};
+const up=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up)};
+addEventListener('pointermove',mv);addEventListener('pointerup',up);draw();
+}
+function lists(){
+$('#ll').innerHTML=S.L.map((l,i)=>`<button class="chip${l===S.sel?' on':''}" data-i="${i}">${l.t=='emoji'?esc(l.txt):l.t=='circle'?'●':'■'} ${i+1}</button>`).join('')||'<p class="mu">Слоёв пока нет</p>';
+document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{S.sel=S.L[b.dataset.i];draw();lists();panel()});
+}
+const op=(a,v)=>a.map(([k,n])=>`<option value="${k}"${k==v?' selected':''}>${n}</option>`).join('');
+function panel(){
+const l=S.sel,e=$('#pp');
+if(!l){e.innerHTML='<p class="mu">Выберите слой или добавьте анимацию из каталога слева.</p>';return}
+const rg=(k,lab,a,b,s=1)=>`<label>${lab}<input type="range" data-k="${k}" min="${a}" max="${b}" step="${s}" value="${l[k]}"></label>`;
+e.innerHTML=`<label>Фигура<select data-k="t">${op([['circle','Круг'],['square','Квадрат'],['emoji','Эмодзи']],l.t)}</select></label>
+<label>Эмодзи или символ<input type="text" data-k="txt" value="${esc(l.txt)}"></label>
+<label>Цвет<input type="color" data-k="c" value="${l.c}" style="width:60px"></label>
+${rg('s','Размер',20,220)}${rg('x','Позиция X, %',0,100)}${rg('y','Позиция Y, %',0,100)}
+<label>Анимация<select data-k="an">${op([...Object.entries(A).map(([k,m])=>[k,m.n]),['none','Без анимации']],l.an)}</select></label>
+${rg('d','Длительность, сек',1,10,.5)}
+<button id="del" style="width:100%">🗑 Удалить слой</button>`;
+e.querySelectorAll('[data-k]').forEach(i=>i.oninput=()=>{l[i.dataset.k]=i.type=='range'?+i.value:i.value;draw();if(i.dataset.k=='txt'||i.dataset.k=='t')lists()});
+$('#del').onclick=()=>{S.L=S.L.filter(x=>x!==l);S.sel=null;all()};
+}
+function all(){$('#b0').value=S.bg[0];$('#b1').value=S.bg[1];draw();lists();panel()}
+function add(k){
+const l={id:++N,t:'circle',txt:'✨',c:pick(['#ff4d8d','#8b5cf6','#22d3ee','#facc15']),s:80,x:50,y:50,an:k,d:3};
+S.L.push(l);S.sel=l;all();
+}
+// Каталог
+$('#cat').innerHTML=Object.entries(A).map(([k,m])=>`<button class="card" data-a="${k}"><span class="dot"></span>${m.n}</button>`).join('');
+document.querySelectorAll('.card').forEach(b=>{run(b.firstChild,A[b.dataset.a],1.6);b.onclick=()=>add(b.dataset.a)});
+// Экспорт: CAML (CoreAnimation) + ZIP
+const rgb=h=>[1,3,5].map(i=>(parseInt(h.slice(i,i+2),16)/255).toFixed(3)).join(' ');
+function caml(){
+const ls=S.L.map(l=>{
+const m=A[l.an],an=m?`<animations><animation type="CABasicAnimation" keyPath="${m.k}" fromValue="${m.a}" toValue="${m.b}" duration="${l.d}" repeatCount="inf" autoreverses="${m.alt}"/></animations>`:'',
+pos=`${(l.x/100*390).toFixed(1)} ${(l.y/100*844).toFixed(1)}`;
+return l.t=='emoji'
+?`<CATextLayer name="L${l.id}" string="${esc(l.txt)}" fontSize="${l.s*.8|0}" alignmentMode="center" position="${pos}" bounds="0 0 ${l.s} ${l.s}">${an}</CATextLayer>`
+:`<CALayer name="L${l.id}" position="${pos}" bounds="0 0 ${l.s} ${l.s}" backgroundColor="${rgb(l.c)} 1" cornerRadius="${l.t=='circle'?l.s/2:l.s*.2}">${an}</CALayer>`;
+}).join('\n');
+return`<?xml version="1.0" encoding="UTF-8"?>\n<caml xmlns="http://www.apple.com/CoreAnimation/1.0"><CALayer name="root" bounds="0 0 390 844" position="195 422" backgroundColor="${rgb(S.bg[0])} 1"><sublayers>\n${ls}\n</sublayers></CALayer></caml>`;
+}
+const T=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+const crc=b=>{let c=-1;for(const x of b)c=T[(c^x)&255]^(c>>>8);return(c^-1)>>>0};
+function zip(files){
+const e=new TextEncoder(),parts=[],cen=[];let off=0;
+for(const[n,d]of Object.entries(files)){
+const nb=e.encode(n),db=e.encode(d),c=crc(db);
+const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x800,true);h.setUint32(14,c,true);h.setUint32(18,db.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);
+parts.push(new Uint8Array(h.buffer),nb,db);
+const g=new DataView(new ArrayBuffer(46));g.setUint32(0,0x02014b50,true);g.setUint16(4,20,true);g.setUint16(6,20,true);g.setUint16(8,0x800,true);g.setUint32(16,c,true);g.setUint32(20,db.length,true);g.setUint32(24,db.length,true);g.setUint16(28,nb.length,true);g.setUint32(42,off,true);
+cen.push(new Uint8Array(g.buffer),nb);off+=30+nb.length+db.length;
+}
+const cl=cen.reduce((s,x)=>s+x.length,0),n=Object.keys(files).length,z=new DataView(new ArrayBuffer(22));
+z.setUint32(0,0x06054b50,true);z.setUint16(8,n,true);z.setUint16(10,n,true);z.setUint32(12,cl,true);z.setUint32(16,off,true);
+return new Blob([...parts,...cen,new Uint8Array(z.buffer)],{type:'application/zip'});
+}
+async function dl(b,n){
+const f=new File([b],n);
+try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f]});return}}catch(e){}
+const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;a.click();
+}
+const fname=()=>($('#nm').value.trim()||'theme').replace(/[^\wа-яё-]+/gi,'_');
+const proj=()=>JSON.stringify({name:$('#nm').value,bg:S.bg,L:S.L});
+$('#ex').onclick=()=>{
+if(!S.L.length)return toast('Добавьте хотя бы один слой');
+dl(zip({'manifest.json':JSON.stringify({name:$('#nm').value,format:'tendies',version:1,size:[390,844],layers:S.L.length},null,1),'Wallpaper.ca/main.caml':caml(),'project.json':proj()}),fname()+'.tendies');
+toast('Файл '+fname()+'.tendies готов');
+};
+$('#sv').onclick=()=>dl(new Blob([proj()],{type:'application/json'}),fname()+'.json');
+$('#op').onclick=()=>$('#fi').click();
+$('#fi').onchange=async e=>{
+try{const d=JSON.parse(await e.target.files[0].text());S.bg=d.bg;S.L=d.L;S.sel=null;$('#nm').value=d.name||'Тема';all();toast('Проект открыт')}catch(x){toast('Не удалось прочитать файл проекта')}
+};
+$('#go').onclick=()=>ai($('#ai').value);
+$('#ai').onkeydown=e=>{if(e.key=='Enter')ai(e.target.value)};
+$('#rnd').onclick=()=>ai('');
+$('#b0').oninput=e=>{S.bg[0]=e.target.value;draw()};
+$('#b1').oninput=e=>{S.bg[1]=e.target.value;draw()};
+function toast(t){const m=$('#msg');m.textContent=t;m.style.opacity=1;clearTimeout(m._t);m._t=setTimeout(()=>m.style.opacity=0,2200)}
+function fit(){
+const m=$('main'),s=Math.min((m.clientHeight-40)/844,(m.clientWidth-40)/390);
+$('#wrap').style.cssText=`width:${390*s}px;height:${844*s}px`;$('#ph').style.transform=`scale(${s})`;
+}
+addEventListener('resize',fit);
+ai('неон');fit();
+</script></body></html>
